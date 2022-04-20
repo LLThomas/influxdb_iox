@@ -1,5 +1,8 @@
+use std::sync::Weak;
+
 use http::Response;
 use hyper::Body;
+use tokio::sync::Mutex;
 
 use crate::{rand_id, write_to_router, ServerFixture, TestConfig, TestServer};
 
@@ -28,6 +31,7 @@ pub struct MiniCluster {
 }
 
 impl MiniCluster {
+    /// Create a new, unshared MiniCluster.
     pub fn new() -> Self {
         let org_id = rand_id();
         let bucket_id = rand_id();
@@ -41,30 +45,78 @@ impl MiniCluster {
         }
     }
 
-    /// Create a "standard" MiniCluster that has a router, ingester,
-    /// querier
-    ///
-    /// Long term plan is that this will be shared across multiple tests if possible
-    pub async fn create_standard(database_url: String) -> MiniCluster {
-        let router2_config = TestConfig::new_router2(&database_url);
-        // fast parquet
-        let ingester_config =
-            TestConfig::new_ingester(&router2_config).with_fast_parquet_generation();
-        let querier_config = TestConfig::new_querier(&ingester_config);
 
-        // Set up the cluster  ====================================
-        Self::new()
-            .with_router2(router2_config)
-            .await
-            .with_ingester(ingester_config)
-            .await
-            .with_querier(querier_config)
-            .await
+    /// Create a new mini cluser that shares the same underlying
+    /// servers as `template` but has a different namespace
+    fn with_new_namespace(&self) -> Self {
+        let org_id = rand_id();
+        let bucket_id = rand_id();
+        let namespace = format!("{}_{}", org_id, bucket_id);
+
+        Self {
+            router2: self.router2.clone(),
+            ingester: self.ingester.clone(),
+            querier: self.querier.clone(),
+            compactor: self.compactor.clone(),
+            other_servers: self.other_servers.clone(),
+
+            org_id,
+            bucket_id,
+            namespace,
+        }
+
     }
 
-    /// return a "standard" MiniCluster that has a router, ingester,
+
+    /// Create a "standard" shared MiniCluster that has a router, ingester,
+    /// querier
+    ///
+    /// Note: Since the underlying server processes are shared across multiple
+    /// tests so all users of this MiniCluster should only modify
+    /// their namespace
+    pub async fn create_shared(database_url: String) -> MiniCluster {
+        let mut global_shared_cluster = GLOBAL_SHARED_CLUSTER.lock().await;
+
+        // see if there are any concurrently used cluster
+        let global_cluster = global_shared_cluster.take()
+            .and_then(|w| w.upgrade());
+
+        let global_cluster = match global_shared_cluster.take() {
+            Some(cluster) => cluster,
+            None => {
+                // First time through, need to create one
+                let router2_config = TestConfig::new_router2(&database_url);
+                // fast parquet
+                let ingester_config =
+                    TestConfig::new_ingester(&router2_config).with_fast_parquet_generation();
+                let querier_config = TestConfig::new_querier(&ingester_config);
+
+                // Set up the cluster  ====================================
+                Arc::new(
+                    Self::new()
+                        .with_router2(router2_config)
+                        .await
+                        .with_ingester(ingester_config)
+                        .await
+                        .with_querier(querier_config)
+                        .await
+                )
+            }
+        };
+
+        let cluster = global_cluster.with_new_namespace();
+        // Put the shared cluster back
+        *global_shared_cluster = Some(Arc::downgrade(&global_cluster));
+        cluster
+    }
+
+    /// return a "standard" shared MiniCluster that has a router, ingester,
     /// querier and quickly persists files to parquet
-    pub async fn create_quickly_peristing(database_url: String) -> MiniCluster {
+    ///
+    /// Note: The underlying server processes are shared across multiple
+    /// tests so all users of this MiniCluster should only modify
+    /// their namespace
+    pub async fn create_shared_quickly_peristing(database_url: String) -> MiniCluster {
         let router2_config = TestConfig::new_router2(&database_url);
         // fast parquet
         let ingester_config =
@@ -186,4 +238,9 @@ impl MiniCluster {
     pub fn other_servers(&self) -> &[ServerFixture] {
         self.other_servers.as_ref()
     }
+}
+
+
+lazy_static::lazy_static! {
+    static ref GLOBAL_SHARED_CLUSTER: Mutex<Option<Weak<MiniCluster>>> = Mutex::new(None);
 }

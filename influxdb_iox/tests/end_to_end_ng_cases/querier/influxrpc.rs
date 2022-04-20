@@ -72,7 +72,7 @@ async fn run_no_data_test(custom: FCustom) {
     let database_url = maybe_skip_integration!();
 
     // Set up the cluster  ====================================
-    let mut cluster = MiniCluster::create_standard(database_url).await;
+    let mut cluster = MiniCluster::create_shared(database_url).await;
 
     StepTest::new(&mut cluster, vec![Step::Custom(custom)])
         .run()
@@ -407,7 +407,7 @@ async fn run_data_test(generator: Arc<DataGenerator>, custom: FCustom) {
     let database_url = maybe_skip_integration!();
 
     // Set up the cluster  ====================================
-    let mut cluster = MiniCluster::create_standard(database_url).await;
+    let mut cluster = MiniCluster::create_shared(database_url).await;
 
     StepTest::new(
         &mut cluster,

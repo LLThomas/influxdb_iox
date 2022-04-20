@@ -6093,6 +6093,7 @@ dependencies = [
  "http",
  "hyper",
  "influxdb_iox_client",
+ "lazy_static",
  "nix",
  "once_cell",
  "rand",

@@ -19,7 +19,7 @@ use super::{addrs::BindAddresses, ServerType, TestConfig};
 
 /// Represents a server that has been started and is available for
 /// testing.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ServerFixture {
     server: Arc<TestServer>,
 }

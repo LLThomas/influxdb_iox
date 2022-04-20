@@ -11,7 +11,7 @@ use predicates::prelude::*;
 async fn ingester_schema_client() {
     let database_url = maybe_skip_integration!();
 
-    let mut cluster = MiniCluster::create_standard(database_url).await;
+    let mut cluster = MiniCluster::create_shared(database_url).await;
 
     StepTest::new(
         &mut cluster,
@@ -57,7 +57,7 @@ async fn ingester_schema_client() {
 async fn ingester_schema_cli() {
     let database_url = maybe_skip_integration!();
 
-    let mut cluster = MiniCluster::create_standard(database_url).await;
+    let mut cluster = MiniCluster::create_shared(database_url).await;
 
     StepTest::new(
         &mut cluster,
