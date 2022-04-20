@@ -572,10 +572,7 @@ workflows:
       - build_dev
       - doc
       - workspace_hack_checks
-      - build_release:
-          filters:
-            branches:
-              only: main
+      - build_release
       - deploy_release:
           filters:
             branches:
