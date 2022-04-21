@@ -1,4 +1,4 @@
-use std::sync::{Arc, Weak};
+use std::{sync::{Arc, Weak}, collections::HashMap};
 
 use http::Response;
 use hyper::Body;
@@ -76,12 +76,15 @@ impl MiniCluster {
     /// tests so all users of this MiniCluster should only modify
     /// their namespace
     pub async fn create_shared(database_url: String) -> MiniCluster {
-        let mut global_shared_cluster = GLOBAL_SHARED_CLUSTER.lock().await;
+        let mut shared_servers = GLOBAL_SHARED_SERVERS.lock().await;
 
-        // see if there are any concurrently used cluster
-        let global_cluster = global_shared_cluster.take().and_then(|w| w.upgrade());
+        let hash_key = "SHARED".to_string();
 
-        let global_cluster = match global_cluster {
+        let maybe_cluster = shared_servers.get(&hash_key)
+            .and_then(|shared| shared.try_new_cluster());
+
+
+        let new_cluster = match maybe_cluster {
             Some(cluster) => cluster,
             None => {
                 // First time through, need to create one
@@ -92,22 +95,19 @@ impl MiniCluster {
                 let querier_config = TestConfig::new_querier(&ingester_config);
 
                 // Set up the cluster  ====================================
-                Arc::new(
-                    Self::new()
-                        .with_router2(router2_config)
-                        .await
-                        .with_ingester(ingester_config)
-                        .await
-                        .with_querier(querier_config)
-                        .await,
-                )
+                Self::new()
+                    .with_router2(router2_config)
+                    .await
+                    .with_ingester(ingester_config)
+                    .await
+                    .with_querier(querier_config)
+                    .await
             }
         };
 
-        let cluster = global_cluster.with_new_namespace();
-        // Put the shared cluster back
-        *global_shared_cluster = Some(Arc::downgrade(&global_cluster));
-        cluster
+        // Update the shared servers to point at the newly created server proesses
+        shared_servers.insert(hash_key, SharedServers::new(&new_cluster));
+        new_cluster
     }
 
     /// return a "standard" shared MiniCluster that has a router, ingester,
@@ -223,6 +223,29 @@ impl MiniCluster {
     }
 }
 
+/// holds shared server processes
+struct SharedServers {
+    router2: Weak<TestServer>,
+    ingester: Weak<TestServer>,
+    querier: Weak<TestServer>,
+}
+
+impl SharedServers {
+    /// Save the server processes in this shared servers as weak references
+    pub fn new(cluster: &MiniCluster) -> Self {
+        todo!()
+    }
+
+    /// tries to create a new MiniCluster reusing the existing
+    /// [TestServer]s. Return None if they are no longer active
+    fn try_new_cluster(&self) -> Option<MiniCluster> {
+        todo!()
+    }
+}
+
+
+
+
 lazy_static::lazy_static! {
-    static ref GLOBAL_SHARED_CLUSTER: Mutex<Option<Weak<MiniCluster>>> = Mutex::new(None);
+    static ref GLOBAL_SHARED_SERVERS: Mutex<HashMap<String, SharedServers>> = Mutex::new(HashMap::new());
 }
