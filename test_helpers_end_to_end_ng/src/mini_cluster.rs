@@ -1,28 +1,32 @@
-use std::sync::{Weak, Arc};
+use std::sync::{Arc, Weak};
 
 use http::Response;
 use hyper::Body;
 use tokio::sync::Mutex;
 
-use crate::{rand_id, write_to_router, ServerFixture, TestConfig, TestServer};
+use crate::{
+    rand_id,
+    server_fixture::{create_test_server, restart_test_server},
+    write_to_router, TestConfig, TestServer,
+};
 
 /// Structure that holds NG services and helpful accessors
 #[derive(Debug, Default)]
 pub struct MiniCluster {
     /// Standard optional router2
-    router2: Option<ServerFixture>,
+    router2: Option<Arc<TestServer>>,
 
     /// Standard optional ingster2
-    ingester: Option<ServerFixture>,
+    ingester: Option<Arc<TestServer>>,
 
     /// Standard optional querier
-    querier: Option<ServerFixture>,
+    querier: Option<Arc<TestServer>>,
 
     /// Standard optional compactor
-    compactor: Option<ServerFixture>,
+    compactor: Option<Arc<TestServer>>,
 
-    /// Optional additional `ServerFixture`s that can be used for specific tests
-    other_servers: Vec<ServerFixture>,
+    /// Optional additional `Arc<TestServer>`s that can be used for specific tests
+    other_servers: Vec<Arc<TestServer>>,
 
     // Potentially helpful data
     org_id: String,
@@ -45,7 +49,6 @@ impl MiniCluster {
         }
     }
 
-
     /// Create a new mini cluser that shares the same underlying
     /// servers as `template` but has a different namespace
     fn with_new_namespace(&self) -> Self {
@@ -64,9 +67,7 @@ impl MiniCluster {
             bucket_id,
             namespace,
         }
-
     }
-
 
     /// Create a "standard" shared MiniCluster that has a router, ingester,
     /// querier
@@ -78,8 +79,7 @@ impl MiniCluster {
         let mut global_shared_cluster = GLOBAL_SHARED_CLUSTER.lock().await;
 
         // see if there are any concurrently used cluster
-        let global_cluster = global_shared_cluster.take()
-            .and_then(|w| w.upgrade());
+        let global_cluster = global_shared_cluster.take().and_then(|w| w.upgrade());
 
         let global_cluster = match global_cluster {
             Some(cluster) => cluster,
@@ -99,7 +99,7 @@ impl MiniCluster {
                         .with_ingester(ingester_config)
                         .await
                         .with_querier(querier_config)
-                        .await
+                        .await,
                 )
             }
         };
@@ -135,77 +135,60 @@ impl MiniCluster {
 
     /// create a router2 with the specified configuration
     pub async fn with_router2(mut self, router2_config: TestConfig) -> Self {
-        self.router2 = Some(ServerFixture::create(router2_config).await);
+        self.router2 = Some(create_test_server(router2_config).await);
         self
     }
 
     /// create an ingester with the specified configuration;
     pub async fn with_ingester(mut self, ingester_config: TestConfig) -> Self {
-        self.ingester = Some(ServerFixture::create(ingester_config).await);
+        self.ingester = Some(create_test_server(ingester_config).await);
         self
     }
 
     /// create an querier with the specified configuration;
     pub async fn with_querier(mut self, querier_config: TestConfig) -> Self {
-        self.querier = Some(ServerFixture::create(querier_config).await);
+        self.querier = Some(create_test_server(querier_config).await);
         self
     }
 
     /// create a compactor with the specified configuration;
     pub async fn with_compactor(mut self, compactor_config: TestConfig) -> Self {
-        self.compactor = Some(ServerFixture::create(compactor_config).await);
+        self.compactor = Some(create_test_server(compactor_config).await);
         self
     }
 
     /// create another server compactor with the specified configuration;
     pub async fn with_other(mut self, config: TestConfig) -> Self {
-        self.other_servers.push(ServerFixture::create(config).await);
+        self.other_servers.push(create_test_server(config).await);
         self
     }
 
     /// Retrieve the underlying router2 server, if set
     pub fn router2(&self) -> &TestServer {
-        self.router2
-            .as_ref()
-            .expect("router2 not initialized")
-            .server()
+        self.router2.as_ref().expect("router2 not initialized")
     }
 
     /// Retrieve the underlying ingester server, if set
     pub fn ingester(&self) -> &TestServer {
-        self.ingester
-            .as_ref()
-            .expect("ingester not initialized")
-            .server()
+        self.ingester.as_ref().expect("ingester not initialized")
     }
 
     /// Restart ingester.
     ///
     /// This will break all currently connected clients!
     pub async fn restart_ingester(&mut self) {
-        self.ingester = Some(
-            self.ingester
-                .take()
-                .expect("ingester not initialized")
-                .restart_server()
-                .await,
-        )
+        self.ingester =
+            Some(restart_test_server(self.ingester.take().expect("ingester not initialized")).await)
     }
 
     /// Retrieve the underlying querier server, if set
     pub fn querier(&self) -> &TestServer {
-        self.querier
-            .as_ref()
-            .expect("querier not initialized")
-            .server()
+        self.querier.as_ref().expect("querier not initialized")
     }
 
     /// Retrieve the underlying compactor server, if set
     pub fn compactor(&self) -> &TestServer {
-        self.compactor
-            .as_ref()
-            .expect("compactor not initialized")
-            .server()
+        self.compactor.as_ref().expect("compactor not initialized")
     }
 
     /// Get a reference to the mini cluster's org.
@@ -235,11 +218,10 @@ impl MiniCluster {
     }
 
     /// Get a reference to the mini cluster's other servers.
-    pub fn other_servers(&self) -> &[ServerFixture] {
+    pub fn other_servers(&self) -> &[Arc<TestServer>] {
         self.other_servers.as_ref()
     }
 }
-
 
 lazy_static::lazy_static! {
     static ref GLOBAL_SHARED_CLUSTER: Mutex<Option<Weak<MiniCluster>>> = Mutex::new(None);

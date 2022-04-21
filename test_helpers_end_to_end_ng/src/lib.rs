@@ -15,7 +15,7 @@ mod steps;
 pub use client::*;
 pub use config::TestConfig;
 pub use mini_cluster::MiniCluster;
-pub use server_fixture::{ServerFixture, TestServer};
+pub use server_fixture::{create_test_server, TestServer};
 pub use server_type::ServerType;
 pub use steps::{FCustom, Step, StepTest, StepTestState};
 

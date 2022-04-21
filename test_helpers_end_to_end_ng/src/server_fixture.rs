@@ -17,52 +17,34 @@ use crate::{database::initialize_db, server_type::AddAddrEnv};
 
 use super::{addrs::BindAddresses, ServerType, TestConfig};
 
-/// Represents a server that has been started and is available for
-/// testing.
-#[derive(Debug, Clone)]
-pub struct ServerFixture {
-    server: Arc<TestServer>,
+/// Create a new test server and wait for it to be ready. This
+/// is called "create" rather than new because it is async and
+/// waits. The server is not shared with any other tests.
+pub async fn create_test_server(test_config: TestConfig) -> Arc<TestServer> {
+    let mut server = TestServer::new(test_config).await;
+
+    // ensure the server is ready
+    server.wait_until_ready().await;
+
+    Arc::new(server)
 }
 
-impl ServerFixture {
-    /// Create a new server fixture and wait for it to be ready. This
-    /// is called "create" rather than new because it is async and
-    /// waits. The server is not shared with any other tests.
-    pub async fn create(test_config: TestConfig) -> Self {
-        let mut server = TestServer::new(test_config).await;
+/// Restart test server, panic'ing if it is shared with some other
+/// test
+///
+/// This will break all currently connected clients!
+pub async fn restart_test_server(test_server: Arc<TestServer>) -> Arc<TestServer> {
+    // get the underlying server, if possible
+    let mut server = match Arc::try_unwrap(test_server) {
+        Ok(s) => s,
+        Err(_) => panic!("Can not restart server as it is shared"),
+    };
 
-        // ensure the server is ready
-        server.wait_until_ready().await;
+    server.restart().await;
+    server.wait_until_ready().await;
 
-        let server = Arc::new(server);
-
-        ServerFixture { server }
-    }
-
-    /// Restart test server, panic'ing if it is shared with some other
-    /// test
-    ///
-    /// This will break all currently connected clients!
-    pub async fn restart_server(self) -> Self {
-        // get the underlying server, if possible
-        let mut server = match Arc::try_unwrap(self.server) {
-            Ok(s) => s,
-            Err(_) => panic!("Can not restart server as it is shared"),
-        };
-
-        server.restart().await;
-        server.wait_until_ready().await;
-
-        Self {
-            server: Arc::new(server),
-        }
-    }
-
-    /// Get a reference to the underlying server.
-    #[must_use]
-    pub fn server(&self) -> &TestServer {
-        self.server.as_ref()
-    }
+    // rewrite
+    Arc::new(server)
 }
 
 /// Represents the current known state of a TestServer
@@ -102,6 +84,8 @@ struct Process {
 }
 
 impl TestServer {
+    /// Create a new TestServer (not public -- create new TestServers
+    /// via [`create_test_server`] above.
     async fn new(test_config: TestConfig) -> Self {
         let ready = Mutex::new(ServerState::Started);
 
