@@ -118,6 +118,7 @@ pub async fn wait_for_token<F>(
     assert!(!write_token.is_empty());
 
     println!("  write token: {}", write_token);
+    println!("  connectionx: {:?}", ingester_connection);
 
     let retry_duration = Duration::from_secs(MAX_QUERY_RETRY_TIME_SEC);
     let mut write_info_client = influxdb_iox_client::write_info::Client::new(ingester_connection);

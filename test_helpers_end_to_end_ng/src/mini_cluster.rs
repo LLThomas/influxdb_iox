@@ -49,19 +49,26 @@ impl MiniCluster {
         }
     }
 
-    /// Create a new mini cluser that shares the same underlying
-    /// servers as `template` but has a different namespace
-    fn with_new_namespace(&self) -> Self {
+    /// Create a new MiniCluster that shares the same underlying
+    /// servers and a new unique namespace. Internal implementation --
+    /// see [create_shared], [create_shared_quickly_peristing] and [new]
+    /// to create new MiniClusters.
+    fn new_from_servers(
+        router2: Option<Arc<TestServer>>,
+        ingester: Option<Arc<TestServer>>,
+        querier: Option<Arc<TestServer>>,
+        compactor: Option<Arc<TestServer>>,
+    ) -> Self {
         let org_id = rand_id();
         let bucket_id = rand_id();
         let namespace = format!("{}_{}", org_id, bucket_id);
 
         Self {
-            router2: self.router2.clone(),
-            ingester: self.ingester.clone(),
-            querier: self.querier.clone(),
-            compactor: self.compactor.clone(),
-            other_servers: self.other_servers.clone(),
+            router2,
+            ingester,
+            querier,
+            compactor,
+            other_servers: vec![],
 
             org_id,
             bucket_id,
@@ -85,8 +92,13 @@ impl MiniCluster {
 
 
         let new_cluster = match maybe_cluster {
-            Some(cluster) => cluster,
+            Some(cluster) => {
+                println!("AAL reusing existing cluster");
+                cluster
+            },
             None => {
+                println!("AAL need to create a new server");
+
                 // First time through, need to create one
                 let router2_config = TestConfig::new_router2(&database_url);
                 // fast parquet
@@ -225,21 +237,62 @@ impl MiniCluster {
 
 /// holds shared server processes
 struct SharedServers {
-    router2: Weak<TestServer>,
-    ingester: Weak<TestServer>,
-    querier: Weak<TestServer>,
+    router2: Option<Weak<TestServer>>,
+    ingester: Option<Weak<TestServer>>,
+    querier: Option<Weak<TestServer>>,
+    compactor: Option<Weak<TestServer>>,
 }
 
 impl SharedServers {
     /// Save the server processes in this shared servers as weak references
     pub fn new(cluster: &MiniCluster) -> Self {
-        todo!()
+        assert!(cluster.other_servers.is_empty(), "other servers not yet handled in shared mini clusters");
+        let tag_name = cluster.router2.as_ref().map(|f| f.to_string()).unwrap_or_default();
+        println!("AAL Saving exisitng servers: {}", tag_name);
+        Self {
+            router2: cluster.router2.as_ref().map(Arc::downgrade),
+            ingester: cluster.ingester.as_ref().map(Arc::downgrade),
+            querier: cluster.querier.as_ref().map(Arc::downgrade),
+            compactor: cluster.compactor.as_ref().map(Arc::downgrade),
+        }
+
+
     }
 
     /// tries to create a new MiniCluster reusing the existing
     /// [TestServer]s. Return None if they are no longer active
     fn try_new_cluster(&self) -> Option<MiniCluster> {
-        todo!()
+        // The goal of the following code is to bail out (return None
+        // from the function) if any of the optional weak references aren't present
+        let router2 = if let Some(router2) = self.router2.as_ref() {
+            Some(router2.upgrade()?) // return None if can't upgrade
+        } else {
+            None
+        };
+
+        let ingester = if let Some(ingester) = self.ingester.as_ref() {
+            Some(ingester.upgrade()?) // return None if can't upgrade
+        } else {
+            None
+        };
+
+        let querier = if let Some(querier) = self.querier.as_ref() {
+            Some(querier.upgrade()?) // return None if can't upgrade
+        } else {
+            None
+        };
+
+        let compactor = if let Some(compactor) = self.compactor.as_ref() {
+            Some(compactor.upgrade()?) // return None if can't upgrade
+        } else {
+            None
+        };
+
+        // If haven't returned above, means we were able to upgrade
+        // all available servers
+        let tag_name = router2.as_ref().map(|f| f.to_string()).unwrap_or_default();
+        println!("AAL Reusing new servers: {}", tag_name);
+        Some(MiniCluster::new_from_servers(router2, ingester, querier, compactor))
     }
 }
 

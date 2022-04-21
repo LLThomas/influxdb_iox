@@ -93,14 +93,19 @@ impl TestServer {
             Self::create_server_process(&test_config, None).await,
         ));
 
-        Self {
+
+        let server = Self {
             ready,
             server_process,
             test_config,
             router_grpc_connection: None,
             ingester_grpc_connection: None,
             querier_grpc_connection: None,
-        }
+        };
+
+        println!("{}: created", server);
+
+        server
     }
 
     /// Return a channel connected to the gRPC API, panic'ing if not the correct type of server
@@ -158,6 +163,7 @@ impl TestServer {
     /// (re)establish channels to all gRPC services that are running
     /// for this particular server type
     async fn reconnect(&mut self) -> Result<(), String> {
+        println!("{}: Reconnecting", self);
         let server_type = self.test_config.server_type();
 
         self.router_grpc_connection =
@@ -201,7 +207,8 @@ impl TestServer {
     }
 
     /// Restarts the tests server process, but does not reconnect clients
-    async fn restart(&self) {
+    async fn restart(&mut self) {
+        println!("{}: restarting", self);
         let mut ready_guard = self.ready.lock().await;
         let mut server_process = self.server_process.lock().await;
         kill_politely(&mut server_process.child, Duration::from_secs(5));
@@ -461,7 +468,8 @@ impl std::fmt::Display for TestServer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         write!(
             f,
-            "TestServer {:?} ({})",
+            "TestServer({:p}) {:?} ({})",
+            self,
             self.test_config.server_type(),
             self.addrs()
         )
@@ -470,6 +478,7 @@ impl std::fmt::Display for TestServer {
 
 impl Drop for TestServer {
     fn drop(&mut self) {
+        println!("{}: Dropping", self);
         let mut server_lock = self
             .server_process
             .try_lock()
@@ -477,7 +486,7 @@ impl Drop for TestServer {
 
         kill_politely(&mut server_lock.child, Duration::from_secs(1));
 
-        dump_log_to_stdout(self.test_config.server_type(), &server_lock.log_path);
+        dump_log_to_stdout(format!("{}", self), &server_lock.log_path);
     }
 }
 
@@ -498,14 +507,14 @@ async fn server_dead(server_process: &Mutex<Process>) -> bool {
 }
 
 /// Dumps the content of the log file to stdout
-fn dump_log_to_stdout(server_type: ServerType, log_path: &Path) {
+fn dump_log_to_stdout(server_name: String, log_path: &Path) {
     use std::io::Read;
 
     let mut f = std::fs::File::open(log_path).expect("failed to open log file");
     let mut buffer = [0_u8; 8 * 1024];
 
     println!("****************");
-    println!("Start {:?} TestServer Output", server_type);
+    println!("Start {} Output", server_name);
     println!("****************");
 
     while let Ok(read) = f.read(&mut buffer) {
@@ -523,7 +532,7 @@ fn dump_log_to_stdout(server_type: ServerType, log_path: &Path) {
     }
 
     println!("****************");
-    println!("End {:?} TestServer Output", server_type);
+    println!("End {} TestServer Output", server_name);
     println!("****************");
 }
 
