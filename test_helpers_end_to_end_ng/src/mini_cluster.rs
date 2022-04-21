@@ -1,4 +1,4 @@
-use std::sync::Weak;
+use std::sync::{Weak, Arc};
 
 use http::Response;
 use hyper::Body;
@@ -81,7 +81,7 @@ impl MiniCluster {
         let global_cluster = global_shared_cluster.take()
             .and_then(|w| w.upgrade());
 
-        let global_cluster = match global_shared_cluster.take() {
+        let global_cluster = match global_cluster {
             Some(cluster) => cluster,
             None => {
                 // First time through, need to create one
