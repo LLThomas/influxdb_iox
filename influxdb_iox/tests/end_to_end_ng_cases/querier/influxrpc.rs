@@ -28,6 +28,7 @@ use self::data::DataGenerator;
 #[tokio::test]
 /// Validate that capabilities storage endpoint is hooked up
 async fn capabilities() {
+    test_helpers::maybe_start_logging();
     run_no_data_test(Box::new(|state: &mut StepTestState| {
         async move {
             let mut storage_client =
@@ -52,6 +53,7 @@ async fn capabilities() {
 #[tokio::test]
 /// Validate that storage offsets endpoint is hooked up (required by internal Influx cloud)
 async fn offsets() {
+    test_helpers::maybe_start_logging();
     run_no_data_test(Box::new(|state: &mut StepTestState| {
         async move {
             let mut storage_client =
@@ -69,6 +71,7 @@ async fn offsets() {
 
 /// Runs the specified custom function on a cluster with no data
 async fn run_no_data_test(custom: FCustom) {
+    test_helpers::maybe_start_logging();
     let database_url = maybe_skip_integration!();
 
     // Set up the cluster  ====================================
@@ -81,6 +84,7 @@ async fn run_no_data_test(custom: FCustom) {
 
 #[tokio::test]
 async fn read_filter() {
+    test_helpers::maybe_start_logging();
     let generator = Arc::new(data::DataGenerator::new());
     run_data_test(Arc::clone(&generator), Box::new(move |state: &mut StepTestState| {
         let mut storage_client =
@@ -139,6 +143,7 @@ async fn read_filter() {
 
 #[tokio::test]
 async fn tag_keys() {
+    test_helpers::maybe_start_logging();
     let generator = Arc::new(data::DataGenerator::new());
     run_data_test(
         Arc::clone(&generator),
@@ -176,6 +181,7 @@ async fn tag_keys() {
 
 #[tokio::test]
 async fn tag_values() {
+    test_helpers::maybe_start_logging();
     let generator = Arc::new(data::DataGenerator::new());
     run_data_test(
         Arc::clone(&generator),
@@ -219,6 +225,7 @@ async fn tag_values() {
 
 #[tokio::test]
 async fn measurement_names() {
+    test_helpers::maybe_start_logging();
     let generator = Arc::new(data::DataGenerator::new());
     run_data_test(
         Arc::clone(&generator),
@@ -264,6 +271,7 @@ async fn measurement_names() {
 
 #[tokio::test]
 async fn measurement_tag_keys() {
+    test_helpers::maybe_start_logging();
     let generator = Arc::new(data::DataGenerator::new());
     run_data_test(
         Arc::clone(&generator),
@@ -310,6 +318,7 @@ async fn measurement_tag_keys() {
 
 #[tokio::test]
 async fn measurement_tag_values() {
+    test_helpers::maybe_start_logging();
     let generator = Arc::new(data::DataGenerator::new());
     run_data_test(
         Arc::clone(&generator),
@@ -357,6 +366,7 @@ async fn measurement_tag_values() {
 
 #[tokio::test]
 async fn measurement_fields() {
+    test_helpers::maybe_start_logging();
     let generator = Arc::new(data::DataGenerator::new());
     run_data_test(
         Arc::clone(&generator),

@@ -6095,6 +6095,7 @@ dependencies = [
  "influxdb_iox_client",
  "lazy_static",
  "nix",
+ "observability_deps",
  "once_cell",
  "rand",
  "reqwest",

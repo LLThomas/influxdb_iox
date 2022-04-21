@@ -1,6 +1,7 @@
 //! Client helpers for writing end to end ng tests
 use std::collections::HashMap;
 use std::time::Duration;
+use observability_deps::tracing::info;
 
 use arrow::record_batch::RecordBatch;
 use futures::{stream::FuturesUnordered, StreamExt};
@@ -86,7 +87,7 @@ pub async fn combined_token_info(
         .into_iter()
         .collect::<Result<Vec<_>, _>>()?;
 
-    println!("combining response: {:#?}", responses);
+    info!(?responses, "combining responses");
 
     // merge them together
     Ok(merge_responses(responses))
@@ -117,8 +118,8 @@ pub async fn wait_for_token<F>(
     let write_token = write_token.into();
     assert!(!write_token.is_empty());
 
-    println!("  write token: {}", write_token);
-    println!("  connectionx: {:?}", ingester_connection);
+    info!("  write token: {}", write_token);
+    info!("  connectionx: {:?}", ingester_connection);
 
     let retry_duration = Duration::from_secs(MAX_QUERY_RETRY_TIME_SEC);
     let mut write_info_client = influxdb_iox_client::write_info::Client::new(ingester_connection);
@@ -130,11 +131,11 @@ pub async fn wait_for_token<F>(
                     if f(&res) {
                         return;
                     }
-                    println!("Retrying; predicate not satistified: {:?}", res);
+                    info!("Retrying; predicate not satistified: {:?}", res);
                 }
 
                 Err(e) => {
-                    println!("Retrying; Got error getting write_info: {}", e);
+                    info!("Retrying; Got error getting write_info: {}", e);
                 }
             };
             interval.tick().await;
@@ -146,11 +147,11 @@ pub async fn wait_for_token<F>(
 
 /// Waits for the specified write token to be readable
 pub async fn wait_for_readable(write_token: impl Into<String>, ingester_connection: Connection) {
-    println!("Waiting for write token to be readable");
+    info!("Waiting for write token to be readable");
 
     wait_for_token(write_token, ingester_connection, |res| {
         if all_readable(res) {
-            println!("Write is readable: {:?}", res);
+            info!("Write is readable: {:?}", res);
             true
         } else {
             false
@@ -161,11 +162,11 @@ pub async fn wait_for_readable(write_token: impl Into<String>, ingester_connecti
 
 /// Waits for the write token to be persisted
 pub async fn wait_for_persisted(write_token: impl Into<String>, ingester_connection: Connection) {
-    println!("Waiting for write token to be persisted");
+    info!("Waiting for write token to be persisted");
 
     wait_for_token(write_token, ingester_connection, |res| {
         if all_persisted(res) {
-            println!("Write is persisted: {:?}", res);
+            info!("Write is persisted: {:?}", res);
             true
         } else {
             false
@@ -236,7 +237,7 @@ fn status_order(status: KafkaPartitionStatus) -> u8 {
 }
 
 fn merge_info(left: &mut KafkaPartitionInfo, right: &KafkaPartitionInfo) {
-    println!("existing_info {:?}, info: {:?}", left, right);
+    info!("existing_info {:?}, info: {:?}", left, right);
 
     let left_status = left.status();
     let right_status = right.status();

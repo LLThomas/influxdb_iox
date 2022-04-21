@@ -9,6 +9,7 @@ edition = "2021"
 # Workspace dependencies, in alphabetical order
 arrow_util = { path = "../arrow_util" }
 influxdb_iox_client = { path = "../influxdb_iox_client", features = ["flight", "format", "write_lp"] }
+observability_deps = { path = "../observability_deps" }
 test_helpers = { path = "../test_helpers" }
 
 # Crates.io dependencies, in alphabetical order
