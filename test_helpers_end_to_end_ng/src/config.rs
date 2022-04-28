@@ -138,6 +138,12 @@ impl TestConfig {
             .with_kafka_partition(0)
     }
 
+    /// sets the ingester so that it will not persist any data (as the perist threshold is too high)
+    pub fn with_no_persist(self) -> Self {
+        // chosen to be one less than default INFLUXDB_IOX_PAUSE_INGEST_SIZE_BYTES
+        self.with_env("INFLUXDB_IOX_PERSIST_MEMORY_THRESHOLD_BYTES", "1999999")
+    }
+
     /// Adds an ingester that ingests from the specified kafka partition
     pub fn with_kafka_partition(self, kafka_partition_id: u64) -> Self {
         self.with_env(

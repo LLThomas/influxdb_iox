@@ -21,9 +21,13 @@ async fn basic_multi_ingesters() {
     let router2_config =
         TestConfig::new_router2(&database_url).with_new_write_buffer_kafka_partitions(2);
 
-    // ingester gets partition 0
-    let ingester_config = TestConfig::new_ingester(&router2_config).with_kafka_partition(0);
-    let ingester2_config = TestConfig::new_ingester(&router2_config).with_kafka_partition(1);
+    let ingester_config = TestConfig::new_ingester(&router2_config)
+        .with_kafka_partition(0)
+        .with_no_persist();
+
+    let ingester2_config = TestConfig::new_ingester(&router2_config)
+        .with_kafka_partition(1)
+        .with_no_persist();
 
     let querier_config = TestConfig::new_querier_without_ingester(&ingester_config)
         // Configure to talk with both the ingesters
