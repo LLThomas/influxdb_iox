@@ -85,20 +85,23 @@ compile_error!("heappy and jemalloc_replacing_malloc features are mutually exclu
     long_about = r#"InfluxDB IOx server and command line tools
 
 Examples:
-    # Run the InfluxDB IOx server in all-in-one mode:
-    influxdb_iox run
+    # Run the InfluxDB IOx server in all-in-one "run" mode
+    influxdb_iox
+
+    # Display all available modes, including "run"
+    influxdb_iox --help
+
+    # Run the InfluxDB IOx server in all-in-one mode with extra verbose logging
+    influxdb_iox -v
+
+    # Run InfluxDB IOx with full debug logging specified with LOG_FILTER
+    LOG_FILTER=debug influxdb_iox
+
+    # Display all "run" mode settings
+    influxdb_iox run --help
 
     # Run the interactive SQL prompt
     influxdb_iox sql
-
-    # Display all server settings
-    influxdb_iox run --help
-
-    # Run the InfluxDB IOx server with extra verbose logging
-    influxdb_iox run -v
-
-    # Run InfluxDB IOx with full debug logging specified with LOG_FILTER
-    LOG_FILTER=debug influxdb_iox run
 
 Command are generally structured in the form:
     <type of object> <action> <arguments>
@@ -146,7 +149,7 @@ struct Config {
     all_in_one_config: all_in_one::Config,
 
     #[clap(subcommand)]
-    command: Command,
+    command: Option<Command>,
 }
 
 #[derive(Debug, clap::Parser)]
@@ -241,7 +244,14 @@ fn main() -> Result<(), std::io::Error> {
         }
 
         match config.command {
-            Command::Database(config) => {
+            None => {
+                let _tracing_guard = handle_init_logs(init_simple_logs(log_verbose_count));
+                if let Err(e) = all_in_one::command(config.all_in_one_config).await {
+                    eprintln!("Server command failed: {}", e);
+                    std::process::exit(ReturnCode::Failure as _)
+                }
+            }
+            Some(Command::Database(config)) => {
                 let _tracing_guard = handle_init_logs(init_simple_logs(log_verbose_count));
                 let connection = connection().await;
                 if let Err(e) = commands::database::command(connection, config).await {
@@ -249,7 +259,7 @@ fn main() -> Result<(), std::io::Error> {
                     std::process::exit(ReturnCode::Failure as _)
                 }
             }
-            Command::Operation(config) => {
+            Some(Command::Operation(config)) => {
                 let _tracing_guard = handle_init_logs(init_simple_logs(log_verbose_count));
                 let connection = connection().await;
                 if let Err(e) = commands::operations::command(connection, config).await {
@@ -257,7 +267,7 @@ fn main() -> Result<(), std::io::Error> {
                     std::process::exit(ReturnCode::Failure as _)
                 }
             }
-            Command::Server(config) => {
+            Some(Command::Server(config)) => {
                 let _tracing_guard = handle_init_logs(init_simple_logs(log_verbose_count));
                 let connection = connection().await;
                 if let Err(e) = commands::server::command(connection, config).await {
@@ -265,7 +275,7 @@ fn main() -> Result<(), std::io::Error> {
                     std::process::exit(ReturnCode::Failure as _)
                 }
             }
-            Command::Remote(config) => {
+            Some(Command::Remote(config)) => {
                 let _tracing_guard = handle_init_logs(init_simple_logs(log_verbose_count));
                 let connection = connection().await;
                 if let Err(e) = commands::remote::command(connection, config).await {
@@ -273,7 +283,7 @@ fn main() -> Result<(), std::io::Error> {
                     std::process::exit(ReturnCode::Failure as _)
                 }
             }
-            Command::Router(config) => {
+            Some(Command::Router(config)) => {
                 let _tracing_guard = handle_init_logs(init_simple_logs(log_verbose_count));
                 let connection = connection().await;
                 if let Err(e) = commands::router::command(connection, config).await {
@@ -281,7 +291,7 @@ fn main() -> Result<(), std::io::Error> {
                     std::process::exit(ReturnCode::Failure as _)
                 }
             }
-            Command::Run(config) => {
+            Some(Command::Run(config)) => {
                 let _tracing_guard =
                     handle_init_logs(init_logs_and_tracing(log_verbose_count, &config));
                 if let Err(e) = commands::run::command(*config).await {
@@ -289,7 +299,7 @@ fn main() -> Result<(), std::io::Error> {
                     std::process::exit(ReturnCode::Failure as _)
                 }
             }
-            Command::Schema(config) => {
+            Some(Command::Schema(config)) => {
                 let _tracing_guard = handle_init_logs(init_simple_logs(log_verbose_count));
                 let connection = connection().await;
                 if let Err(e) = commands::schema::command(connection, config).await {
@@ -297,7 +307,7 @@ fn main() -> Result<(), std::io::Error> {
                     std::process::exit(ReturnCode::Failure as _)
                 }
             }
-            Command::Sql(config) => {
+            Some(Command::Sql(config)) => {
                 let _tracing_guard = handle_init_logs(init_simple_logs(log_verbose_count));
                 let connection = connection().await;
                 if let Err(e) = commands::sql::command(connection, config).await {
@@ -305,7 +315,7 @@ fn main() -> Result<(), std::io::Error> {
                     std::process::exit(ReturnCode::Failure as _)
                 }
             }
-            Command::Storage(config) => {
+            Some(Command::Storage(config)) => {
                 let _tracing_guard = handle_init_logs(init_simple_logs(log_verbose_count));
                 let connection = connection().await;
                 if let Err(e) = commands::storage::command(connection, config).await {
@@ -313,14 +323,14 @@ fn main() -> Result<(), std::io::Error> {
                     std::process::exit(ReturnCode::Failure as _)
                 }
             }
-            Command::Catalog(config) => {
+            Some(Command::Catalog(config)) => {
                 let _tracing_guard = handle_init_logs(init_simple_logs(log_verbose_count));
                 if let Err(e) = commands::catalog::command(config).await {
                     eprintln!("{}", e);
                     std::process::exit(ReturnCode::Failure as _)
                 }
             }
-            Command::Debug(config) => {
+            Some(Command::Debug(config)) => {
                 let _tracing_guard = handle_init_logs(init_simple_logs(log_verbose_count));
                 if let Err(e) = commands::debug::command(config).await {
                     eprintln!("{}", e);
