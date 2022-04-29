@@ -5804,6 +5804,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "sqlx-acquire-meter"
+version = "0.1.0"
+dependencies = [
+ "async-stream",
+ "dotenv",
+ "either",
+ "futures",
+ "futures-util",
+ "rand",
+ "sqlx",
+ "tokio",
+ "tokio-stream",
+ "workspace-hack",
+]
+
+[[package]]
 name = "sqlx-core"
 version = "0.5.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
