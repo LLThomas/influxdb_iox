@@ -30,8 +30,6 @@ mod commands {
     pub mod query;
     pub mod remote;
     pub mod run;
-    pub mod server;
-    pub mod server_remote;
     pub mod sql;
     pub mod storage;
     pub mod tracing;
@@ -52,19 +50,6 @@ static VERSION_STRING: Lazy<String> = Lazy::new(|| {
         )
     )
 });
-
-/// A comfy_table style that uses single ASCII lines for all borders with plusses at intersections.
-///
-/// Example:
-///
-/// ```
-/// +------+--------------------------------------+
-/// | Name | UUID                                 |
-/// +------+--------------------------------------+
-/// | bar  | ccc2b8bc-f25d-4341-9b64-b9cfe50d26de |
-/// | foo  | 3317ff2b-bbab-43ae-8c63-f0e9ea2f3bdb |
-/// +------+--------------------------------------+
-const TABLE_STYLE_SINGLE_LINE_BORDERS: &str = "||--+-++|    ++++++";
 
 #[cfg(all(
     feature = "heappy",
@@ -169,9 +154,6 @@ enum Command {
     /// Commands to run against remote IOx APIs
     Remote(commands::remote::Config),
 
-    /// IOx server configuration commands
-    Server(commands::server::Config),
-
     /// Manage long-running IOx operations
     Operation(commands::operations::Config),
 
@@ -254,14 +236,6 @@ fn main() -> Result<(), std::io::Error> {
                 let connection = connection().await;
                 if let Err(e) = commands::operations::command(connection, config).await {
                     eprintln!("{}", e);
-                    std::process::exit(ReturnCode::Failure as _)
-                }
-            }
-            Command::Server(config) => {
-                let _tracing_guard = handle_init_logs(init_simple_logs(log_verbose_count));
-                let connection = connection().await;
-                if let Err(e) = commands::server::command(connection, config).await {
-                    eprintln!("Server command failed: {}", e);
                     std::process::exit(ReturnCode::Failure as _)
                 }
             }
