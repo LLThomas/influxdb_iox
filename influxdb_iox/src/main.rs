@@ -32,7 +32,6 @@ mod commands {
     pub mod remote;
     pub mod router;
     pub mod run;
-    pub mod schema;
     pub mod server;
     pub mod server_remote;
     pub mod sql;
@@ -178,9 +177,6 @@ enum Command {
     /// Router-related commands
     Router(commands::router::Config),
 
-    /// IOx schema configuration commands
-    Schema(commands::schema::Config),
-
     /// IOx server configuration commands
     Server(commands::server::Config),
 
@@ -309,14 +305,6 @@ fn main() -> Result<(), std::io::Error> {
                     std::process::exit(ReturnCode::Failure as _)
                 }
             }
-            Command::Schema(config) => {
-                let _tracing_guard = handle_init_logs(init_simple_logs(log_verbose_count));
-                let connection = connection().await;
-                if let Err(e) = commands::schema::command(connection, config).await {
-                    eprintln!("{}", e);
-                    std::process::exit(ReturnCode::Failure as _)
-                }
-            }
             Command::Sql(config) => {
                 let _tracing_guard = handle_init_logs(init_simple_logs(log_verbose_count));
                 let connection = connection().await;
@@ -342,7 +330,7 @@ fn main() -> Result<(), std::io::Error> {
             }
             Command::Debug(config) => {
                 let _tracing_guard = handle_init_logs(init_simple_logs(log_verbose_count));
-                if let Err(e) = commands::debug::command(config).await {
+                if let Err(e) = commands::debug::command(connection, config).await {
                     eprintln!("{}", e);
                     std::process::exit(ReturnCode::Failure as _)
                 }
