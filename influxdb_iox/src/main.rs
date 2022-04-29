@@ -29,7 +29,6 @@ mod commands {
     pub mod operations;
     pub mod query;
     pub mod remote;
-    pub mod router;
     pub mod run;
     pub mod server;
     pub mod server_remote;
@@ -170,9 +169,6 @@ enum Command {
     /// Commands to run against remote IOx APIs
     Remote(commands::remote::Config),
 
-    /// Router-related commands
-    Router(commands::router::Config),
-
     /// IOx server configuration commands
     Server(commands::server::Config),
 
@@ -273,14 +269,6 @@ fn main() -> Result<(), std::io::Error> {
                 let _tracing_guard = handle_init_logs(init_simple_logs(log_verbose_count));
                 let connection = connection().await;
                 if let Err(e) = commands::remote::command(connection, config).await {
-                    eprintln!("{}", e);
-                    std::process::exit(ReturnCode::Failure as _)
-                }
-            }
-            Command::Router(config) => {
-                let _tracing_guard = handle_init_logs(init_simple_logs(log_verbose_count));
-                let connection = connection().await;
-                if let Err(e) = commands::router::command(connection, config).await {
                     eprintln!("{}", e);
                     std::process::exit(ReturnCode::Failure as _)
                 }
