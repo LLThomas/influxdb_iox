@@ -7,10 +7,8 @@ use influxdb_iox_client::{
     flight::{self, generated_types::ReadInfo},
     format::QueryOutputFormat,
     management::{self, generated_types::database_status::DatabaseState, generated_types::*},
-    write,
 };
-use iox_time::TimeProvider;
-use std::{fs::File, io::Read, num::NonZeroU64, path::PathBuf, str::FromStr, time::Duration};
+use std::{num::NonZeroU64, path::PathBuf, str::FromStr, time::Duration};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -21,12 +19,6 @@ mod recover;
 #[allow(clippy::enum_variant_names)]
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Error reading file {:?}: {}", file_name, source)]
-    ReadingFile {
-        file_name: PathBuf,
-        source: std::io::Error,
-    },
-
     #[error("Error formatting: {0}")]
     FormattingError(#[from] influxdb_iox_client::format::Error),
 
@@ -220,9 +212,6 @@ enum Command {
     /// Return configuration of specific database
     Get(Get),
 
-    /// Write data into the specified database
-    Write(Write),
-
     /// Query the data with SQL
     Query(Query),
 
@@ -362,26 +351,6 @@ pub async fn command(connection: Connection, config: Config) -> Result<()> {
             let mut client = management::Client::new(connection);
             let database = client.get_database(name, omit_defaults).await?;
             println!("{}", serde_json::to_string_pretty(&database)?);
-        }
-        Command::Write(write) => {
-            let mut client = write::Client::new(connection);
-
-            let mut file = File::open(&write.file_name).map_err(|e| Error::ReadingFile {
-                file_name: write.file_name.clone(),
-                source: e,
-            })?;
-
-            let mut lp_data = String::new();
-            file.read_to_string(&mut lp_data)
-                .map_err(|e| Error::ReadingFile {
-                    file_name: write.file_name.clone(),
-                    source: e,
-                })?;
-
-            let default_time = iox_time::SystemProvider::new().now().timestamp_nanos();
-            let lines_written = client.write_lp(write.name, lp_data, default_time).await?;
-
-            println!("{} Lines OK", lines_written);
         }
         Command::Query(query) => {
             let mut client = flight::Client::new(connection);
