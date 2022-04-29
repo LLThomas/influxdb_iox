@@ -4,11 +4,9 @@ use crate::TABLE_STYLE_SINGLE_LINE_BORDERS;
 use comfy_table::{Cell, Table};
 use influxdb_iox_client::{
     connection::Connection,
-    flight::{self, generated_types::ReadInfo},
-    format::QueryOutputFormat,
     management::{self, generated_types::database_status::DatabaseState, generated_types::*},
 };
-use std::{num::NonZeroU64, path::PathBuf, str::FromStr, time::Duration};
+use std::{num::NonZeroU64, path::PathBuf, time::Duration};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -212,9 +210,6 @@ enum Command {
     /// Return configuration of specific database
     Get(Get),
 
-    /// Query the data with SQL
-    Query(Query),
-
     /// Manage database chunks
     Chunk(chunk::Config),
 
@@ -351,34 +346,6 @@ pub async fn command(connection: Connection, config: Config) -> Result<()> {
             let mut client = management::Client::new(connection);
             let database = client.get_database(name, omit_defaults).await?;
             println!("{}", serde_json::to_string_pretty(&database)?);
-        }
-        Command::Query(query) => {
-            let mut client = flight::Client::new(connection);
-            let Query {
-                name,
-                format,
-                query,
-            } = query;
-
-            let format = QueryOutputFormat::from_str(&format)?;
-
-            let mut query_results = client
-                .perform_query(ReadInfo {
-                    namespace_name: name,
-                    sql_query: query,
-                })
-                .await?;
-
-            // It might be nice to do some sort of streaming write
-            // rather than buffering the whole thing.
-            let mut batches = vec![];
-            while let Some(data) = query_results.next().await? {
-                batches.push(data);
-            }
-
-            let formatted_result = format.format(&batches)?;
-
-            println!("{}", formatted_result);
         }
         Command::Chunk(config) => {
             chunk::command(connection, config).await?;

@@ -28,6 +28,7 @@ mod commands {
     pub mod database;
     pub mod debug;
     pub mod operations;
+    pub mod query;
     pub mod remote;
     pub mod router;
     pub mod run;
@@ -200,6 +201,9 @@ enum Command {
 
     /// Write data into the specified database
     Write(commands::write::Config),
+
+    /// Query the data with SQL
+    Query(commands::query::Config),
 }
 
 fn main() -> Result<(), std::io::Error> {
@@ -347,6 +351,14 @@ fn main() -> Result<(), std::io::Error> {
                 let _tracing_guard = handle_init_logs(init_simple_logs(log_verbose_count));
                 let connection = connection().await;
                 if let Err(e) = commands::write::command(connection, config).await {
+                    eprintln!("{}", e);
+                    std::process::exit(ReturnCode::Failure as _)
+                }
+            }
+            Command::Query(config) => {
+                let _tracing_guard = handle_init_logs(init_simple_logs(log_verbose_count));
+                let connection = connection().await;
+                if let Err(e) = commands::query::command(connection, config).await {
                     eprintln!("{}", e);
                     std::process::exit(ReturnCode::Failure as _)
                 }
