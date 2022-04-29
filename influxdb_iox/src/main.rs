@@ -25,7 +25,6 @@ use tokio::runtime::Runtime;
 
 mod commands {
     pub mod catalog;
-    pub mod database;
     pub mod debug;
     pub mod operations;
     pub mod query;
@@ -164,9 +163,6 @@ struct Config {
 
 #[derive(Debug, clap::Parser)]
 enum Command {
-    /// Database-related commands
-    Database(commands::database::Config),
-
     /// Run the InfluxDB IOx server
     // Clippy recommended boxing this variant because it's much larger than the others
     Run(Box<commands::run::Config>),
@@ -257,14 +253,6 @@ fn main() -> Result<(), std::io::Error> {
         }
 
         match config.command {
-            Command::Database(config) => {
-                let _tracing_guard = handle_init_logs(init_simple_logs(log_verbose_count));
-                let connection = connection().await;
-                if let Err(e) = commands::database::command(connection, config).await {
-                    eprintln!("{}", e);
-                    std::process::exit(ReturnCode::Failure as _)
-                }
-            }
             Command::Operation(config) => {
                 let _tracing_guard = handle_init_logs(init_simple_logs(log_verbose_count));
                 let connection = connection().await;
